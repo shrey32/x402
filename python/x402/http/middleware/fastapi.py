@@ -165,6 +165,21 @@ def _facilitator_error_response(error: FacilitatorResponseError) -> JSONResponse
     )
 
 
+def _decoded_route_path(request: Request) -> str:
+    """request.url.path with any ASGI root_path mount prefix stripped,
+    mirroring Starlette's own get_route_path so mounted apps stay protected.
+    """
+    path = request.url.path
+    root_path = request.scope.get("root_path", "")
+    if not root_path or not path.startswith(root_path):
+        return path
+    if path == root_path:
+        return ""
+    if path[len(root_path)] == "/":
+        return path[len(root_path) :]
+    return path
+
+
 def payment_middleware(
     routes: RoutesConfig,
     server: x402ResourceServer,
@@ -255,7 +270,7 @@ def payment_middleware(
         context = HTTPRequestContext(
             adapter=adapter,
             path=raw_path,
-            decoded_path=request.url.path,
+            decoded_path=_decoded_route_path(request),
             method=request.method,
             payment_header=(
                 adapter.get_header("payment-signature") or adapter.get_header("x-payment")
